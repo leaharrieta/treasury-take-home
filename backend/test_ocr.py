@@ -5,15 +5,25 @@
 
 
 from PIL import Image
+
 from services.ocr_service import extract_text
+from services.field_extractor import extract_fields
 
 
-# Load label image
-image = Image.open("test_images/test2.png")
+# Load a real alcohol label image
+image = Image.open("test_images/sample_label.png")
 
-# Extract text using local OCR
+# Extract raw text using local OCR
 text = extract_text(image)
 
 print("OCR RESULT:")
 print("--------------------")
 print(text)
+
+
+# Extract structured fields from the OCR text
+fields = extract_fields(text)
+
+print("\nEXTRACTED FIELDS:")
+print("--------------------")
+print(fields)
