@@ -198,66 +198,69 @@ def normalize_match_text(value: str):
     return " ".join(value.split())
 
 
-# Find how closely an application value matches text found on the label
+# Find how closely the application value appears in OCR text
 def find_best_match(application_value: str, ocr_text: str):
     expected = normalize_match_text(application_value)
 
-    # Clean each OCR line
-    lines = [
-        normalize_match_text(line)
-        for line in ocr_text.splitlines()
-        if line.strip()
-    ]
+    # Split the expected value into individual words
+    expected_words = expected.split()
 
-    # Also combine neighboring lines in case OCR split a name
-    candidates = lines.copy()
+    # Normalize the entire OCR result
+    detected = normalize_match_text(ocr_text)
+    detected_words = detected.split()
 
-    for index in range(len(lines) - 1):
-        combined = lines[index] + " " + lines[index + 1]
-        candidates.append(combined)
+    matched_words = 0
 
-    best_score = 0
+    # Check whether each expected word has a close OCR match
+    for expected_word in expected_words:
+        best_score = 0
 
-    # Compare the application value to each OCR candidate
-    for candidate in candidates:
-        score = SequenceMatcher(
-            None,
-            expected,
-            candidate
-        ).ratio()
+        for detected_word in detected_words:
+            score = SequenceMatcher(
+                None,
+                expected_word,
+                detected_word
+            ).ratio()
 
-        if score > best_score:
-            best_score = score
+            if score > best_score:
+                best_score = score
 
-    return best_score
+        # Allow small OCR spelling mistakes
+        if best_score >= 0.75:
+            matched_words += 1
+
+    if not expected_words:
+        return 0
+
+    return matched_words / len(expected_words)
 
 
-# Validate a text field such as brand name or class/type
+# Validate brand name or class/type against OCR text
 def validate_text_field(field_name: str, application_value: str, ocr_text: str):
     expected = normalize_match_text(application_value)
     full_text = normalize_match_text(ocr_text)
 
-    # Exact normalized value was found
+    # Exact normalized text appears in OCR output
     if expected in full_text:
         return {
             "status": "match",
             "message": f"{field_name} matches the application."
         }
 
-    similarity = find_best_match(
+    score = find_best_match(
         application_value,
         ocr_text
     )
 
-    # Very close OCR result
-    if similarity >= 0.90:
+    # Almost all expected words were recognized
+    if score >= 0.90:
         return {
             "status": "match",
             "message": f"{field_name} matches the application."
         }
 
-    # Possible OCR mistake
-    if similarity >= 0.70:
+    # Some of the expected text was recognized
+    if score >= 0.60:
         return {
             "status": "needs_review",
             "message": f"{field_name} may match but requires manual review."
