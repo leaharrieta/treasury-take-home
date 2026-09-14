@@ -1,9 +1,78 @@
-from fastapi import FastAPI
+from io import BytesIO
+
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from PIL import Image, UnidentifiedImageError
+
+from services.field_extractor import extract_fields
+from services.ocr_service import extract_ocr_data, extract_text
+from services.validator import validate_label
+
 
 # FastAPI application
 app = FastAPI()
 
+
 # Return confirmation message
 @app.get("/")
 def home():
-    return {"message": "API is running"}
+    return {"message": "Alcohol Label Verifier API is running"}
+
+
+# Verify an uploaded label against application information
+@app.post("/verify")
+async def verify_label(
+    label_image: UploadFile = File(...),
+    brand_name: str = Form(...),
+    class_type: str = Form(...),
+    alcohol_content: str = Form(...),
+    net_contents: str = Form(...)
+):
+    allowed_types = ["image/jpeg", "image/png"]
+
+    if label_image.content_type not in allowed_types:
+        raise HTTPException(
+            status_code=400,
+            detail="Please upload a JPG or PNG image."
+        )
+
+    try:
+        # Read the uploaded image
+        image_bytes = await label_image.read()
+        image = Image.open(BytesIO(image_bytes)).convert("RGB")
+
+    except UnidentifiedImageError:
+        raise HTTPException(
+            status_code=400,
+            detail="The uploaded file could not be read as an image."
+        )
+
+    # Extract text from the label
+    ocr_text = extract_text(image)
+
+    # Get OCR confidence information
+    ocr_data = extract_ocr_data(image)
+
+    # Extract structured label fields
+    label_fields = extract_fields(ocr_text)
+
+    # Store the application values entered by the user
+    application_data = {
+        "brand_name": brand_name,
+        "class_type": class_type,
+        "alcohol_content": alcohol_content,
+        "net_contents": net_contents
+    }
+
+    # Compare the application against the label
+    results = validate_label(
+        application_data,
+        label_fields,
+        ocr_text,
+        ocr_data["average_confidence"]
+    )
+
+    return {
+        "ocr_confidence": ocr_data["average_confidence"],
+        "extracted_fields": label_fields,
+        "results": results
+    }
