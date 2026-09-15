@@ -3,8 +3,15 @@ from io import BytesIO
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from PIL import Image, UnidentifiedImageError
 
-from services.field_extractor import extract_fields
-from services.ocr_service import extract_ocr_data, extract_text
+from services.field_extractor import (
+    extract_fields,
+    extract_government_warning
+)
+from services.ocr_service import (
+    extract_ocr_data,
+    extract_text,
+    extract_warning_data
+)
 from services.validator import validate_label
 
 
@@ -52,6 +59,9 @@ async def verify_label(
     # Get OCR confidence information
     ocr_data = extract_ocr_data(image)
 
+    # Read the government warning separately
+    warning_data = extract_warning_data(image)
+
     # Extract structured label fields
     label_fields = extract_fields(ocr_text)
 
@@ -65,14 +75,15 @@ async def verify_label(
 
     # Compare the application against the label
     results = validate_label(
-        application_data,
-        label_fields,
-        ocr_text,
-        ocr_data["average_confidence"]
+    application_data,
+    label_fields,
+    ocr_text,
+    ocr_data["average_confidence"]
     )
 
     return {
-        "ocr_confidence": ocr_data["average_confidence"],
-        "extracted_fields": label_fields,
-        "results": results
+    "ocr_confidence": ocr_data["average_confidence"],
+    "warning_confidence": warning_data["confidence"],
+    "extracted_fields": label_fields,
+    "results": results
     }

@@ -90,3 +90,88 @@ def extract_ocr_data(image: Image.Image):
         "words": words,
         "average_confidence": round(average_confidence, 2)
     }
+
+# Extract the government warning from a focused image region
+def extract_warning_data(image: Image.Image):
+    processed_image = preprocess_image(image)
+
+    # Get OCR words and their positions
+    data = pytesseract.image_to_data(
+        processed_image,
+        output_type=Output.DICT
+    )
+
+    heading_index = None
+
+    # Find the word GOVERNMENT
+    for index, word in enumerate(data["text"]):
+        clean_word = "".join(
+            character
+            for character in word.upper()
+            if character.isalpha()
+        )
+
+        if clean_word == "GOVERNMENT":
+            heading_index = index
+            break
+
+    # Warning heading was not detected
+    if heading_index is None:
+        return {
+            "text": None,
+            "confidence": 0
+        }
+
+    # Get the location of the warning heading
+    x = data["left"][heading_index]
+    y = data["top"][heading_index]
+
+    image_width, image_height = processed_image.size
+
+    # Make a focused crop around the warning area
+    crop_width = int(image_width * 0.45)
+    crop_height = int(image_height * 0.45)
+
+    center_x = x
+
+    left = max(0, center_x - crop_width // 2)
+    top = max(0, y - 40)
+
+    right = min(image_width, left + crop_width)
+    bottom = min(image_height, top + crop_height)
+
+    warning_crop = processed_image.crop(
+        (left, top, right, bottom)
+    )
+
+    # OCR the warning as one text block
+    warning_text = pytesseract.image_to_string(
+        warning_crop,
+        config="--psm 6"
+    )
+
+    # Get confidence values from the focused crop
+    warning_data = pytesseract.image_to_data(
+        warning_crop,
+        config="--psm 6",
+        output_type=Output.DICT
+    )
+
+    confidences = []
+
+    for confidence in warning_data["conf"]:
+        confidence = float(confidence)
+
+        if confidence >= 0:
+            confidences.append(confidence)
+
+    average_confidence = (
+        sum(confidences) / len(confidences)
+        if confidences
+        else 0
+    )
+
+    return {
+        "text": warning_text.strip(),
+        "confidence": round(average_confidence, 2)
+    }
