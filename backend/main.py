@@ -1,3 +1,4 @@
+import time 
 from io import BytesIO
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
@@ -23,6 +24,23 @@ app = FastAPI()
 @app.get("/")
 def home():
     return {"message": "Alcohol Label Verifier API is running"}
+
+
+# Determine the overall result from all verification fields
+def get_overall_status(results):
+    statuses = [
+        result["status"]
+        for result in results.values()
+    ]
+
+    if "mismatch" in statuses:
+        return "mismatch"
+
+    if "needs_review" in statuses:
+        return "needs_review"
+
+    # If all fields match
+    return "match"
 
 
 # Verify an uploaded label against application information
@@ -52,6 +70,9 @@ async def verify_label(
             status_code=400,
             detail="The uploaded file could not be read as an image."
         )
+    
+    # Start measuring verification time
+    start_time = time.perf_counter()
 
     # Extract text from the label
     ocr_text = extract_text(image)
@@ -81,9 +102,19 @@ async def verify_label(
     ocr_data["average_confidence"]
     )
 
+    # Determine the overall verification result
+    overall_status = get_overall_status(results)
+
+    # Calculate total processing time
+    processing_time = round(
+        time.perf_counter() - start_time, 2
+    )
+
     return {
-    "ocr_confidence": ocr_data["average_confidence"],
-    "warning_confidence": warning_data["confidence"],
-    "extracted_fields": label_fields,
-    "results": results
+        "overall_status": overall_status,
+        "processing_time_seconds": processing_time,
+        "meets_5_second_target": processing_time <= 5,
+        "ocr_confidence": ocr_data["average_confidence"],
+        "extracted_fields": label_fields,
+        "results": results
     }
