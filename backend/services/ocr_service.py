@@ -175,3 +175,48 @@ def extract_warning_data(image: Image.Image):
         "text": warning_text.strip(),
         "confidence": round(average_confidence, 2)
     }
+
+# Run OCR using several image versions and combine the results
+def extract_combined_text(image: Image.Image) -> str:
+    results = []
+
+    # Pass 1: original image
+    original_text = pytesseract.image_to_string(image)
+    results.append(original_text)
+
+    # Convert image to OpenCV format
+    image_array = np.array(image)
+
+    # Pass 2: grayscale and enlarged
+    gray = cv2.cvtColor(image_array, cv2.COLOR_RGB2GRAY)
+
+    enlarged = cv2.resize(
+        gray,
+        None,
+        fx=2,
+        fy=2,
+        interpolation=cv2.INTER_CUBIC
+    )
+
+    gray_text = pytesseract.image_to_string(
+        Image.fromarray(enlarged)
+    )
+
+    results.append(gray_text)
+
+    # Pass 3: high contrast threshold
+    _, thresholded = cv2.threshold(
+        enlarged,
+        0,
+        255,
+        cv2.THRESH_BINARY + cv2.THRESH_OTSU
+    )
+
+    threshold_text = pytesseract.image_to_string(
+        Image.fromarray(thresholded)
+    )
+
+    results.append(threshold_text)
+
+    # Combine all recognized text
+    return "\n".join(results)

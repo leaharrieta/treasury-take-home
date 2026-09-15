@@ -9,9 +9,8 @@ from services.field_extractor import (
     extract_government_warning
 )
 from services.ocr_service import (
-    extract_ocr_data,
-    extract_text,
-    extract_warning_data
+    extract_combined_text,
+    extract_ocr_data
 )
 from services.validator import validate_label
 
@@ -74,14 +73,11 @@ async def verify_label(
     # Start measuring verification time
     start_time = time.perf_counter()
 
-    # Extract text from the label
-    ocr_text = extract_text(image)
+    # Read the label using multiple OCR passes
+    ocr_text = extract_combined_text(image)
 
     # Get OCR confidence information
     ocr_data = extract_ocr_data(image)
-
-    # Read the government warning separately
-    warning_data = extract_warning_data(image)
 
     # Extract structured label fields
     label_fields = extract_fields(ocr_text)
