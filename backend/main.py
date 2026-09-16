@@ -13,7 +13,10 @@ from services.ocr_service import (
     extract_ocr_data,
     extract_text
 )
-from services.validator import validate_label
+from services.validator import (
+    combine_warning_results,
+    validate_label
+)
 from services.format_checker import check_warning_bold
 
 
@@ -106,6 +109,12 @@ async def verify_label(
     ocr_data["average_confidence"]
     )
 
+    # Combine warning wording and bold format checks
+    results["government_warning"] = combine_warning_results(
+        results["government_warning"],
+        bold_result
+    )
+
     # Determine the overall verification result
     overall_status = get_overall_status(results)
 
@@ -119,7 +128,6 @@ async def verify_label(
         "processing_time_seconds": processing_time,
         "meets_5_second_target": processing_time <= 5,
         "ocr_confidence": ocr_data["average_confidence"],
-        "warning_bold_check": bold_result,
         "extracted_fields": label_fields,
         "results": results
     }

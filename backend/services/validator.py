@@ -270,3 +270,36 @@ def validate_text_field(field_name: str, application_value: str, ocr_text: str):
         "status": "mismatch",
         "message": f"{field_name} was not found on the label."
     }
+
+    # Combine warning wording and bold-format results
+def combine_warning_results(wording_result, bold_result):
+    if (
+        wording_result["status"] == "mismatch"
+        or bold_result["status"] == "mismatch"
+    ):
+        return {
+            "status": "mismatch",
+            "message": "Government warning does not meet all requirements.",
+            "wording": wording_result["status"],
+            "bold_heading": bold_result["status"]
+        }
+
+    # Any uncertainty goes to manual review
+    if (
+        wording_result["status"] == "needs_review"
+        or bold_result["status"] == "needs_review"
+    ):
+        return {
+            "status": "needs_review",
+            "message": "Government warning requires manual review.",
+            "wording": wording_result["status"],
+            "bold_heading": bold_result["status"]
+        }
+
+    # Both checks passed
+    return {
+        "status": "match",
+        "message": "Government warning wording and formatting were verified.",
+        "wording": "match",
+        "bold_heading": "match"
+    }
