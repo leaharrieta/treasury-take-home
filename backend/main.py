@@ -10,9 +10,11 @@ from services.field_extractor import (
 )
 from services.ocr_service import (
     extract_combined_text,
-    extract_ocr_data
+    extract_ocr_data,
+    extract_text
 )
 from services.validator import validate_label
+from services.format_checker import check_warning_bold
 
 
 # FastAPI application
@@ -73,13 +75,19 @@ async def verify_label(
     # Start measuring verification time
     start_time = time.perf_counter()
 
-    # Read the label using multiple OCR passes
-    ocr_text = extract_combined_text(image)
+    # Check the visual formatting of the warning heading
+    bold_result = check_warning_bold(image)
+
+    # Use the standard OCR result for structured fields
+    ocr_text = extract_text(image)
+
+    # Use multiple OCR passes to improve brand and class matching
+    combined_text = extract_combined_text(image)
 
     # Get OCR confidence information
     ocr_data = extract_ocr_data(image)
 
-    # Extract structured label fields
+    # Extract ABV, net contents, and government warning
     label_fields = extract_fields(ocr_text)
 
     # Store the application values entered by the user
@@ -94,7 +102,7 @@ async def verify_label(
     results = validate_label(
     application_data,
     label_fields,
-    ocr_text,
+    combined_text,
     ocr_data["average_confidence"]
     )
 
@@ -111,6 +119,7 @@ async def verify_label(
         "processing_time_seconds": processing_time,
         "meets_5_second_target": processing_time <= 5,
         "ocr_confidence": ocr_data["average_confidence"],
+        "warning_bold_check": bold_result,
         "extracted_fields": label_fields,
         "results": results
     }
