@@ -23,8 +23,8 @@ def preprocess_image(image: Image.Image) -> Image.Image:
     enlarged = cv2.resize(
         gray,
         None,
-        fx=2,
-        fy=2,
+        fx=1.25,
+        fy=1.25,
         interpolation=cv2.INTER_CUBIC
     )
 
