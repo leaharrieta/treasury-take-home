@@ -92,11 +92,9 @@ def verify_label(
     # Start measuring verification time
     start_time = time.perf_counter()
 
-    # Check the visual formatting of the warning heading
-    bold_result = check_warning_bold(image)
-
-    # Use the standard OCR result for structured fields
-    ocr_text = extract_text(image)
+    # Run OCR once and reuse the result
+    ocr_data = extract_ocr_data(image)
+    ocr_text = ocr_data["text"]
 
     # Get OCR confidence information
     ocr_data = extract_ocr_data(image)
@@ -133,6 +131,13 @@ def verify_label(
                 label_fields["net_contents"] = fallback_net_contents
 
         comparison_text = combined_text
+    
+    # Check the visual formatting of the warning heading
+    bold_result = check_warning_bold(
+        image,
+        ocr_data["data"],
+        ocr_data["ocr_image_size"]
+    )
 
     # Store the application values entered by the user
     application_data = {

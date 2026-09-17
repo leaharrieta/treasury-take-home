@@ -48,47 +48,69 @@ def extract_text(image: Image.Image) -> str:
     return text.strip()
 
 
-# Extract OCR text along with word confidence scores
-def extract_ocr_data(image: Image.Image):
+# Extract text, confidence, and word positions in one OCR pass
+def extract_ocr_data(image):
     processed_image = preprocess_image(image)
 
-    # Get individual OCR words and their confidence values
     data = pytesseract.image_to_data(
         processed_image,
         output_type=Output.DICT
     )
 
-    words = []
+    confidences = []
+    lines = []
+    current_line = []
+    previous_line = None
 
-    for index, text in enumerate(data["text"]):
-        text = text.strip()
+    for index, word in enumerate(data["text"]):
+        word = word.strip()
 
-        if not text:
+        if not word:
             continue
 
+        # Save confidence for recognized words
         confidence = float(data["conf"][index])
 
-        words.append({
-            "text": text,
-            "confidence": confidence
-        })
+        if confidence >= 0:
+            confidences.append(confidence)
 
-    # Calculate average confidence for recognized words
-    valid_confidences = [
-        word["confidence"]
-        for word in words
-        if word["confidence"] >= 0
-    ]
+        # Tesseract gives every word a line number
+        line_number = (
+            data["block_num"][index],
+            data["par_num"][index],
+            data["line_num"][index]
+        )
 
-    average_confidence = (
-        sum(valid_confidences) / len(valid_confidences)
-        if valid_confidences
-        else 0
-    )
+        # Start a new text line when the OCR line changes
+        if previous_line is not None and line_number != previous_line:
+            lines.append(" ".join(current_line))
+            current_line = []
+
+        current_line.append(word)
+        previous_line = line_number
+
+    # Add the final line
+    if current_line:
+        lines.append(" ".join(current_line))
+
+    # Preserve line breaks for field extraction
+    text = "\n".join(lines)
+
+    if confidences:
+        average_confidence = (
+            sum(confidences) / len(confidences)
+        )
+    else:
+        average_confidence = 0
 
     return {
-        "words": words,
-        "average_confidence": round(average_confidence, 2)
+        "text": text,
+        "average_confidence": round(
+            average_confidence,
+            2
+        ),
+        "data": data,
+        "ocr_image_size": processed_image.size
     }
 
 # Run OCR using several image versions and combine the results

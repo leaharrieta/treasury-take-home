@@ -1,19 +1,22 @@
 import cv2
 import numpy as np
-import pytesseract
 from PIL import Image
-from pytesseract import Output
 from difflib import SequenceMatcher
-
-from services.ocr_service import preprocess_image
 
 
 # Measure how much of a word remains after slight erosion
-def get_erosion_ratio(image, data, index):
-    left = data["left"][index]
-    top = data["top"][index]
-    width = data["width"][index]
-    height = data["height"][index]
+def get_erosion_ratio(
+    image,
+    data,
+    index,
+    scale_x,
+    scale_y
+):
+    # Convert OCR coordinates back to original-image coordinates
+    left = int(data["left"][index] * scale_x)
+    top = int(data["top"][index] * scale_y)
+    width = int(data["width"][index] * scale_x)
+    height = int(data["height"][index] * scale_y)
 
     if width <= 0 or height <= 0:
         return 0
@@ -68,15 +71,17 @@ def get_erosion_ratio(image, data, index):
 
 
 # Compare GOVERNMENT WARNING with the text directly after it
-def check_warning_bold(image: Image.Image):
-    # Use the original image to locate the warning heading
-    data = pytesseract.image_to_data(
-        image,
-        output_type=Output.DICT
-    )
-
+def check_warning_bold(image: Image.Image, data, ocr_image_size):
+    # Reuse OCR word positions from the main OCR pass
     government_index = None
     warning_index = None
+
+    # Convert OCR coordinates back to the original image size
+    ocr_width, ocr_height = ocr_image_size
+    original_width, original_height = image.size
+
+    scale_x = original_width / ocr_width
+    scale_y = original_height / ocr_height
 
     # Find GOVERNMENT WARNING even if OCR makes a small spelling error
     for index, word in enumerate(data["text"]):
@@ -129,12 +134,16 @@ def check_warning_bold(image: Image.Image):
         get_erosion_ratio(
             image,
             data,
-            government_index
+            government_index,
+            scale_x,
+            scale_y
         ),
         get_erosion_ratio(
             image,
             data,
-            warning_index
+            warning_index,
+            scale_x,
+            scale_y
         )
     ]
 
@@ -168,7 +177,9 @@ def check_warning_bold(image: Image.Image):
             get_erosion_ratio(
                 image,
                 data,
-                index
+                index,
+                scale_x,
+                scale_y
             )
         )
 

@@ -47,11 +47,12 @@ def extract_abv(text: str):
     return None
 
 
-# Extract net contents using recognized measurement units
+# Extract net contents while allowing common OCR mistakes in numbers
 def extract_net_contents(text: str):
-    # Match any numeric quantity followed by a supported unit
+    # The number may contain OCR mistakes such as O instead of 0
+    # or T/I instead of 1, but the unit must still be a real unit.
     pattern = (
-        r"\b(\d+(?:\.\d+)?)\s*"
+        r"\b([0-9OISTB|]+(?:[.,][0-9OISTB|]+)?)\s*"
         r"(mL|L|PINTS?|PT|FL\.?\s*OZ\.?|"
         r"QUARTS?|QT|GALLONS?|GAL)\b"
     )
@@ -65,10 +66,26 @@ def extract_net_contents(text: str):
     if not match:
         return None
 
-    number = match.group(1)
+    number = match.group(1).upper()
     unit = match.group(2).upper()
 
-    # Normalize the unit for consistent comparison
+    # Correct OCR mistakes only in the numeric portion
+    number = (
+        number
+        .replace("O", "0")
+        .replace("I", "1")
+        .replace("T", "1")
+        .replace("|", "1")
+        .replace("S", "5")
+        .replace("B", "8")
+        .replace(",", ".")
+    )
+
+    # Make sure the corrected value is actually numeric
+    if not re.fullmatch(r"\d+(?:\.\d+)?", number):
+        return None
+
+    # Normalize measurement units
     if unit == "ML":
         unit = "mL"
 
