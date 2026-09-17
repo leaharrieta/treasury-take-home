@@ -21,6 +21,9 @@ from services.validator import (
 from services.format_checker import check_warning_bold
 from fastapi.middleware.cors import CORSMiddleware
 
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
+
 
 # FastAPI application
 app = FastAPI()
@@ -36,9 +39,9 @@ app.add_middleware(
 )
 
 # Return confirmation message
-@app.get("/")
-def home():
-    return {"message": "Alcohol Label Verifier API is running"}
+@app.get("/health")
+def health():
+    return {"status": "Ok"}
 
 
 # Determine the overall result from all verification fields
@@ -169,3 +172,22 @@ async def verify_label(
         "extracted_fields": label_fields,
         "results": results
     }
+
+# Location of the built React application
+frontend_dir = (
+    Path(__file__).resolve().parent.parent
+    / "frontend"
+    / "dist"
+)
+
+
+# Serve the React frontend when a production build exists
+if frontend_dir.exists():
+    app.mount(
+        "/",
+        StaticFiles(
+            directory=str(frontend_dir),
+            html=True
+        ),
+        name="frontend"
+    )

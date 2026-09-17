@@ -1,0 +1,16 @@
+# Python virtual environment
+backend/venv/
+
+# Generated files
+__pycache__/
+*.pyc
+
+# Node dependencies
+frontend/node_modules/
+frontend/dist/
+
+# macOS
+.DS_Store
+
+# Environment variables
+.env
