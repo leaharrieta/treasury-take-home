@@ -63,7 +63,7 @@ def get_overall_status(results):
 
 # Verify an uploaded label against application information
 @app.post("/verify")
-async def verify_label(
+def verify_label(
     label_image: UploadFile = File(...),
     brand_name: str = Form(...),
     class_type: str = Form(...),
@@ -80,7 +80,7 @@ async def verify_label(
 
     try:
         # Read the uploaded image
-        image_bytes = await label_image.read()
+        image_bytes = label_image.file.read()
         image = Image.open(BytesIO(image_bytes)).convert("RGB")
 
     except UnidentifiedImageError:
