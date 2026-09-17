@@ -1,44 +1,102 @@
 import re
 
 
-# Extract alcohol content even when OCR separates the percentage and ALC./VOL.
+# Extract the alcohol percentage from common ALC./VOL. formats
 def extract_abv(text: str):
-    # Find every percentage value in the OCR text
-    percentages = list(re.finditer(r"\b(\d+(?:\.\d+)?)\s*%", text))
-
-    # Find places where Tesseract recognized ALC./VOL.
-    alcohol_markers = list(
-        re.finditer(r"ALC\s*[./\\]*\s*VOL", text, re.IGNORECASE)
+    # First look for a percentage directly followed by ALC./VOL.
+    abv_pattern = (
+        r"\b(\d{1,2}(?:\.\d+)?)\s*%"
+        r"\s*ALC\.?\s*[/\\]?\s*VOL\.?"
     )
 
-    # Compare the position of each percentage to each alcohol marker
+    match = re.search(
+        abv_pattern,
+        text,
+        re.IGNORECASE
+    )
+
+    if match:
+        return match.group(1) + "%"
+
+    # If OCR separated the text, find percentages and ALC./VOL. nearby
+    percentages = list(
+        re.finditer(
+            r"\b(\d{1,2}(?:\.\d+)?)\s*%",
+            text
+        )
+    )
+
+    alcohol_markers = list(
+        re.finditer(
+            r"ALC\.?\s*[/\\]?\s*VOL\.?",
+            text,
+            re.IGNORECASE
+        )
+    )
+
+    # Match a nearby percentage to the alcohol marker
     for percentage in percentages:
         for marker in alcohol_markers:
-            distance = abs(marker.start() - percentage.end())
+            distance = abs(
+                marker.start() - percentage.end()
+            )
 
-            # Allow nearby OCR text or line breaks between the values
-            if distance <= 60:
+            if distance <= 80:
                 return percentage.group(1) + "%"
 
     return None
 
 
-# Extract common net content formats
+# Extract net contents using recognized measurement units
 def extract_net_contents(text: str):
-    patterns = [
-        r"\b\d+(?:\.\d+)?\s*mL\b",
-        r"\b\d+(?:\.\d+)?\s*L\b",
-        r"\b\d+(?:\.\d+)?\s*PINT\b",
-        r"\b\d+(?:\.\d+)?\s*FL\.?\s*OZ\.?\b",
-    ]
+    # Match any numeric quantity followed by a supported unit
+    pattern = (
+        r"\b(\d+(?:\.\d+)?)\s*"
+        r"(mL|L|PINTS?|PT|FL\.?\s*OZ\.?|"
+        r"QUARTS?|QT|GALLONS?|GAL)\b"
+    )
 
-    for pattern in patterns:
-        match = re.search(pattern, text, re.IGNORECASE)
+    match = re.search(
+        pattern,
+        text,
+        re.IGNORECASE
+    )
 
-        if match:
-            return match.group(0)
+    if not match:
+        return None
 
-    return None
+    number = match.group(1)
+    unit = match.group(2).upper()
+
+    # Normalize the unit for consistent comparison
+    if unit == "ML":
+        unit = "mL"
+
+    elif unit == "L":
+        unit = "L"
+
+    elif unit in {"PINT", "PT"}:
+        unit = "PINT"
+
+    elif unit == "PINTS":
+        unit = "PINTS"
+
+    elif unit.replace(".", "").replace(" ", "") == "FLOZ":
+        unit = "FL. OZ."
+
+    elif unit in {"QUART", "QT"}:
+        unit = "QUART"
+
+    elif unit == "QUARTS":
+        unit = "QUARTS"
+
+    elif unit in {"GALLON", "GAL"}:
+        unit = "GALLON"
+
+    elif unit == "GALLONS":
+        unit = "GALLONS"
+
+    return f"{number} {unit}"
 
 
 # Extract the government warning without keeping the rest of the label

@@ -6,7 +6,8 @@ from PIL import Image, UnidentifiedImageError
 
 from services.field_extractor import (
     extract_fields,
-    extract_government_warning
+    extract_abv,
+    extract_net_contents
 )
 from services.ocr_service import (
     extract_combined_text,
@@ -18,11 +19,21 @@ from services.validator import (
     validate_label
 )
 from services.format_checker import check_warning_bold
+from fastapi.middleware.cors import CORSMiddleware
 
 
 # FastAPI application
 app = FastAPI()
 
+
+# Allow the local React frontend to call the API
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
 
 # Return confirmation message
 @app.get("/")
@@ -84,14 +95,41 @@ async def verify_label(
     # Use the standard OCR result for structured fields
     ocr_text = extract_text(image)
 
-    # Use multiple OCR passes to improve brand and class matching
-    combined_text = extract_combined_text(image)
-
     # Get OCR confidence information
     ocr_data = extract_ocr_data(image)
 
     # Extract ABV, net contents, and government warning
     label_fields = extract_fields(ocr_text)
+
+    # Start with the normal OCR text
+    comparison_text = ocr_text
+
+    # Only run extra OCR when the first pass misses a field
+    needs_fallback = (
+        label_fields["alcohol_content"] is None
+        or label_fields["net_contents"] is None
+    )
+
+    if needs_fallback:
+        combined_text = extract_combined_text(image)
+
+        # Try ABV again
+        if label_fields["alcohol_content"] is None:
+            fallback_abv = extract_abv(combined_text)
+
+            if fallback_abv:
+                label_fields["alcohol_content"] = fallback_abv
+
+        # Try net contents again
+        if label_fields["net_contents"] is None:
+            fallback_net_contents = extract_net_contents(
+                combined_text
+            )
+
+            if fallback_net_contents:
+                label_fields["net_contents"] = fallback_net_contents
+
+        comparison_text = combined_text
 
     # Store the application values entered by the user
     application_data = {
@@ -105,7 +143,7 @@ async def verify_label(
     results = validate_label(
     application_data,
     label_fields,
-    combined_text,
+    comparison_text,
     ocr_data["average_confidence"]
     )
 
